@@ -8,6 +8,7 @@ from PIL import Image
 from yt_img.frames import Frame
 from yt_img.selection import (
     FINGERPRINT_SIZE,
+    chunks,
     difference,
     distinct,
     fingerprint,
@@ -119,3 +120,18 @@ def test_spread_of_many_is_even_and_unique() -> None:
     assert picked[0] == 0 and picked[-1] == 720
     gaps = {b - a for a, b in itertools.pairwise(picked)}
     assert gaps == {48}
+
+
+@pytest.mark.parametrize(
+    ("n", "size", "expected"),
+    [
+        (0, 16, []),
+        (3, 16, [[0, 1, 2]]),
+        (16, 16, [list(range(16))]),
+        (17, 16, [list(range(16)), [16]]),
+        (5, 2, [[0, 1], [2, 3], [4]]),
+        (3, 1, [[0], [1], [2]]),
+    ],
+)
+def test_chunks(n: int, size: int, expected: list[list[int]]) -> None:
+    assert chunks(list(range(n)), size) == expected

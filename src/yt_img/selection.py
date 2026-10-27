@@ -50,3 +50,8 @@ def spread(items: Sequence[T], count: int) -> list[T]:
     if count == 1:
         return [items[0]]
     return [items[round(i * (n - 1) / (count - 1))] for i in range(count)]
+
+
+def chunks(items: Sequence[T], size: int) -> list[list[T]]:
+    """Split *items* in order into lists of *size*, the last one may be shorter."""
+    return [list(items[i : i + size]) for i in range(0, len(items), size)]

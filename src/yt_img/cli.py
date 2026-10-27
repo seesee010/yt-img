@@ -11,7 +11,7 @@ from yt_img import __version__
 from yt_img.download import download
 from yt_img.errors import YtImgError
 from yt_img.frames import sample
-from yt_img.selection import distinct, spread
+from yt_img.selection import chunks, distinct, spread
 from yt_img.source import Kind, detect
 from yt_img.tile import image_format, render, save
 
@@ -86,6 +86,13 @@ def parser() -> argparse.ArgumentParser:
         help="width of each frame in pixels (default: %(default)s)",
     )
     p.add_argument(
+        "-p",
+        "--pages",
+        action="store_true",
+        help="put every distinct frame on numbered sheets of COUNT frames "
+        "(<name>-1.png, <name>-2.png, ...) instead of thinning them out",
+    )
+    p.add_argument(
         "--no-labels",
         dest="labels",
         action="store_false",
@@ -98,7 +105,12 @@ def parser() -> argparse.ArgumentParser:
     return p
 
 
-def run(args: argparse.Namespace) -> Path:
+def numbered(path: Path, page: int, total: int) -> Path:
+    """sheet.png -> sheet-1.png, zero-padded to the width of *total*."""
+    return path.with_name(f"{path.stem}-{page:0{len(str(total))}}{path.suffix}")
+
+
+def run(args: argparse.Namespace) -> list[Path]:
     def say(message: str) -> None:
         if not args.quiet:
             print(message, file=sys.stderr)
@@ -124,23 +136,34 @@ def run(args: argparse.Namespace) -> Path:
         frames_dir.mkdir()
         sampled = sample(location, frames_dir, args.interval, args.width)
         kept = distinct(sampled, args.threshold)
-        chosen = spread(kept, args.count)
         output: Path = args.output or Path(f"{name}.png")
-        save(render(chosen, args.columns, args.labels), output)
+        if args.pages:
+            sheets = chunks(kept, args.count)
+            outputs = [
+                numbered(output, i, len(sheets)) for i in range(1, len(sheets) + 1)
+            ]
+            summary = f"{len(sheets)} sheet{'' if len(sheets) == 1 else 's'}"
+        else:
+            sheets = [spread(kept, args.count)]
+            outputs = [output]
+            summary = f"{len(sheets[0])} on the sheet"
+        for frames, path in zip(sheets, outputs, strict=True):
+            save(render(frames, args.columns, args.labels), path)
 
-    say(f"{len(sampled)} sampled, {len(kept)} distinct, {len(chosen)} on the sheet")
-    return output
+    say(f"{len(sampled)} sampled, {len(kept)} distinct, {summary}")
+    return outputs
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
-        output = run(args)
+        outputs = run(args)
     except YtImgError as err:
         print(f"yt-img: error: {err}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
         print("yt-img: interrupted", file=sys.stderr)
         return 130
-    print(output)
+    for output in outputs:
+        print(output)
     return 0
