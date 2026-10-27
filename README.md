@@ -94,6 +94,15 @@ uv run ruff check && uv run ruff format --check && uv run mypy
 
 CI runs lint, format, strict mypy and the full suite on Python 3.11 to 3.14 for every pull request. The tests build real videos with ffmpeg and check the colour of every cell on the sheet.
 
+## Contributors
+
+| | Contributor | Role |
+| --- | --- | --- |
+| <img src="https://github.com/seesee010.png?size=64" width="32" alt=""> | [@seesee010](https://github.com/seesee010) | Maintainer: idea, requirements, review |
+| <img src="https://github.com/anthropics.png?size=64" width="32" alt=""> | [Claude](https://claude.com/claude-code) (Opus 5.5, via Claude Code) | Design, implementation, tests, CI and docs |
+
+Every commit carries a `Co-Authored-By: Claude` trailer. GitHub's contributor list only counts commit authors with a GitHub account, so Claude shows up here instead.
+
 ## License
 
 [GPL-2.0-only](LICENSE).
