@@ -20,20 +20,33 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      FFMPEG_BUILD: ffmpeg-n9.0-latest-linux64-gpl-9.0
     strategy:
       fail-fast: false
       matrix:
         python: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
-      - name: Install ffmpeg
+      - name: Cache ffmpeg
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/ffmpeg
+          key: ffmpeg-${{ env.FFMPEG_BUILD }}
+      - name: Download ffmpeg
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
         timeout-minutes: 5
         env:
-          APT_OPTS: -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+          GH_TOKEN: ${{ github.token }}
         run: |
-          sudo apt-get $APT_OPTS update
-          sudo apt-get $APT_OPTS install -y --no-install-recommends ffmpeg
-          ffmpeg -version | head -1
+          gh release download latest -R BtbN/FFmpeg-Builds -p "$FFMPEG_BUILD.tar.xz" -D /tmp
+          mkdir -p ~/ffmpeg
+          tar -xJf "/tmp/$FFMPEG_BUILD.tar.xz" -C ~/ffmpeg --strip-components=1
+      - name: Put ffmpeg on PATH
+        run: |
+          echo "$HOME/ffmpeg/bin" >> "$GITHUB_PATH"
+          "$HOME/ffmpeg/bin/ffmpeg" -version | head -1
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python }}
