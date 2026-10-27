@@ -1,6 +1,6 @@
 [project]
 name = "yt-img"
-version = "0.1.0"
+version = "0.2.0"
 description = "Turn a YouTube URL or a local video into one contact sheet of distinct frames"
 readme = "README.md"
 license = "GPL-2.0-only"

@@ -37,7 +37,8 @@ def parser() -> argparse.ArgumentParser:
         prog="yt-img",
         description=(
             "Sample a video every few seconds, keep the frames that differ "
-            "enough from the previous one and tile them into one image."
+            "enough from the previous one and tile them into sheets of "
+            "COUNT frames, or into a single sheet with --single."
         ),
     )
     p.add_argument(
@@ -48,7 +49,9 @@ def parser() -> argparse.ArgumentParser:
         "-o",
         "--output",
         type=Path,
-        help="output image, .png/.jpg/.jpeg/.webp (default: <video name>.png)",
+        help="output image, .png/.jpg/.jpeg/.webp; numbered as <name>-1.png, "
+        "<name>-2.png, ... when there is more than one sheet "
+        "(default: <video name>.png)",
     )
     p.add_argument(
         "-i",
@@ -69,7 +72,7 @@ def parser() -> argparse.ArgumentParser:
         "--count",
         type=_number(int, 1),
         default=16,
-        help="maximum number of frames on the sheet (default: %(default)s)",
+        help="maximum number of frames per sheet (default: %(default)s)",
     )
     p.add_argument(
         "-c",
@@ -86,11 +89,11 @@ def parser() -> argparse.ArgumentParser:
         help="width of each frame in pixels (default: %(default)s)",
     )
     p.add_argument(
-        "-p",
-        "--pages",
+        "-s",
+        "--single",
         action="store_true",
-        help="put every distinct frame on numbered sheets of COUNT frames "
-        "(<name>-1.png, <name>-2.png, ...) instead of thinning them out",
+        help="squeeze everything into one sheet of at most COUNT frames, "
+        "picked evenly over the video",
     )
     p.add_argument(
         "--no-labels",
@@ -137,20 +140,22 @@ def run(args: argparse.Namespace) -> list[Path]:
         sampled = sample(location, frames_dir, args.interval, args.width)
         kept = distinct(sampled, args.threshold)
         output: Path = args.output or Path(f"{name}.png")
-        if args.pages:
-            sheets = chunks(kept, args.count)
+        sheets = [spread(kept, args.count)] if args.single else chunks(kept, args.count)
+        if len(sheets) == 1:
+            outputs = [output]
+        else:
             outputs = [
                 numbered(output, i, len(sheets)) for i in range(1, len(sheets) + 1)
             ]
-            summary = f"{len(sheets)} sheet{'' if len(sheets) == 1 else 's'}"
-        else:
-            sheets = [spread(kept, args.count)]
-            outputs = [output]
-            summary = f"{len(sheets[0])} on the sheet"
+        shown = sum(len(frames) for frames in sheets)
+        plural = "" if len(sheets) == 1 else "s"
         for frames, path in zip(sheets, outputs, strict=True):
             save(render(frames, args.columns, args.labels), path)
 
-    say(f"{len(sampled)} sampled, {len(kept)} distinct, {summary}")
+    say(
+        f"{len(sampled)} sampled, {len(kept)} distinct, "
+        f"{shown} on {len(sheets)} sheet{plural}"
+    )
     return outputs
 
 

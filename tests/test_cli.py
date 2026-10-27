@@ -55,7 +55,7 @@ def test_scene_changes_end_up_on_the_sheet(
     code, stdout, stderr = run([str(video), "-o", str(out), "-w", "160"], capsys)
     assert code == 0
     assert stdout == f"{out}\n"
-    assert "6 sampled, 4 distinct, 4 on the sheet" in stderr
+    assert "6 sampled, 4 distinct, 4 on 1 sheet\n" in stderr
     with Image.open(out) as sheet:
         assert grid(sheet, 160, 90) == (4, 1)
         colors = [cell_color(sheet, i, 4, 160, 90) for i in range(4)]
@@ -63,16 +63,25 @@ def test_scene_changes_end_up_on_the_sheet(
         assert close(got, want), (got, want)
 
 
-def test_long_video_is_capped_at_sixteen_frames(
-    make_video: VideoFactory, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize("flag", ["--single", "-s"])
+def test_single_squeezes_into_one_sheet(
+    make_video: VideoFactory,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    flag: str,
 ) -> None:
     video = make_video(["red", "lime", "blue", "yellow"] * 6, seconds=10)
     out = tmp_path / "sheet.png"
-    code, _, stderr = run([str(video), "-o", str(out), "-w", "64"], capsys)
+    code, stdout, stderr = run([str(video), "-o", str(out), "-w", "64", flag], capsys)
     assert code == 0
-    assert "24 sampled, 24 distinct, 16 on the sheet" in stderr
+    assert stdout == f"{out}\n"
+    assert "24 sampled, 24 distinct, 16 on 1 sheet\n" in stderr
+    assert sorted(p.name for p in tmp_path.glob("sheet*")) == ["sheet.png"]
     with Image.open(out) as sheet:
         assert grid(sheet, 64, 36) == (4, 4)
+        # Evenly spread: the first and the last frame are both on it.
+        assert close(cell_color(sheet, 0, 4, 64, 36), RED)
+        assert close(cell_color(sheet, 15, 4, 64, 36), (255, 255, 0))
 
 
 def test_still_video_gives_one_frame(
@@ -82,7 +91,7 @@ def test_still_video_gives_one_frame(
     out = tmp_path / "sheet.png"
     code, _, stderr = run([str(video), "-o", str(out), "-w", "64"], capsys)
     assert code == 0
-    assert "4 sampled, 1 distinct, 1 on the sheet" in stderr
+    assert "4 sampled, 1 distinct, 1 on 1 sheet\n" in stderr
 
 
 def test_options_change_the_result(
@@ -92,12 +101,16 @@ def test_options_change_the_result(
     out = tmp_path / "sheet.png"
     argv = [str(video), "-o", str(out), "-w", "64", "-i", "5", "-n", "4", "-c", "2"]
     code, _, stderr = run([*argv, "-t", "1"], capsys)
-    assert "6 sampled, 1 distinct, 1 on the sheet" in stderr
-    code, _, stderr = run(argv, capsys)
+    assert "6 sampled, 1 distinct, 1 on 1 sheet\n" in stderr
+    code, _, stderr = run([*argv, "--single"], capsys)
     assert code == 0
-    assert "6 sampled, 6 distinct, 4 on the sheet" in stderr
+    assert "6 sampled, 6 distinct, 4 on 1 sheet\n" in stderr
     with Image.open(out) as sheet:
         assert grid(sheet, 64, 36) == (2, 2)
+    code, _, stderr = run(argv, capsys)
+    assert "6 sampled, 6 distinct, 6 on 2 sheets\n" in stderr
+    with Image.open(tmp_path / "sheet-2.png") as sheet:
+        assert grid(sheet, 64, 36) == (2, 1)
 
 
 @pytest.mark.parametrize("suffix", [".mp4", ".mkv", ".webm", ".mov", ".avi", ".gif"])
@@ -239,20 +252,18 @@ def test_real_youtube_video(
         assert sheet.width > 480
 
 
-# -- --pages -----------------------------------------------------------------
+# -- several sheets (the default) ---------------------------------------------
 
 
-def test_pages_keep_every_distinct_frame(
+def test_every_distinct_frame_is_kept_by_default(
     make_video: VideoFactory, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     colors = ["red", "lime", "blue", "yellow"] * 6
     video = make_video(colors, seconds=10)
     out = tmp_path / "sheet.png"
-    code, stdout, stderr = run(
-        [str(video), "-o", str(out), "-w", "64", "--pages"], capsys
-    )
+    code, stdout, stderr = run([str(video), "-o", str(out), "-w", "64"], capsys)
     assert code == 0
-    assert "24 sampled, 24 distinct, 2 sheets" in stderr
+    assert "24 sampled, 24 distinct, 24 on 2 sheets\n" in stderr
     first, second = tmp_path / "sheet-1.png", tmp_path / "sheet-2.png"
     assert stdout == f"{first}\n{second}\n"
     assert not out.exists()
@@ -267,18 +278,19 @@ def test_pages_keep_every_distinct_frame(
         assert close(pixel, want[name]), (k, pixel, name)
 
 
-def test_pages_with_a_single_sheet(
+def test_one_sheet_is_not_numbered(
     make_video: VideoFactory, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     video = make_video(["red", "blue"], seconds=10)
     out = tmp_path / "sheet.webp"
-    code, stdout, stderr = run([str(video), "-o", str(out), "-p", "-w", "64"], capsys)
+    code, stdout, stderr = run([str(video), "-o", str(out), "-w", "64"], capsys)
     assert code == 0
-    assert "2 sampled, 2 distinct, 1 sheet\n" in stderr
-    assert stdout == f"{tmp_path / 'sheet-1.webp'}\n"
+    assert "2 sampled, 2 distinct, 2 on 1 sheet\n" in stderr
+    assert stdout == f"{out}\n"
+    assert [p.name for p in tmp_path.glob("sheet*")] == ["sheet.webp"]
 
 
-def test_pages_are_zero_padded(
+def test_sheets_are_zero_padded(
     make_video: VideoFactory,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -286,7 +298,7 @@ def test_pages_are_zero_padded(
 ) -> None:
     video = make_video(["red", "lime", "blue", "yellow", "white"] * 2, seconds=10)
     monkeypatch.chdir(tmp_path)
-    code, stdout, _ = run([str(video), "--pages", "-n", "1", "-w", "64"], capsys)
+    code, stdout, _ = run([str(video), "-n", "1", "-w", "64"], capsys)
     assert code == 0
     names = stdout.split()
     assert names == [f"{video.stem}-{i:02}.png" for i in range(1, 11)]
@@ -389,7 +401,7 @@ def test_defaults() -> None:
         16,
         4,
     )
-    assert (args.width, args.labels, args.quiet, args.output, args.pages) == (
+    assert (args.width, args.labels, args.quiet, args.output, args.single) == (
         480,
         True,
         False,
