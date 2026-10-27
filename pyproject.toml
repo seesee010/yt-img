@@ -1,0 +1,45 @@
+[project]
+name = "yt-img"
+version = "0.1.0"
+description = "Turn a YouTube URL or a local video into one contact sheet of distinct frames"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pillow>=10.1",
+    "yt-dlp>=2024.1.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.11",
+    "pytest>=8",
+    "pytest-cov>=5",
+    "ruff>=0.6",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers --cov=yt_img --cov-branch --cov-report=term-missing --cov-fail-under=100"
+markers = ["network: needs internet access, only runs with --run-network"]
+
+[tool.coverage.run]
+source = ["yt_img"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+files = ["src", "tests"]
+strict = true
+
+[[tool.mypy.overrides]]
+module = ["yt_dlp", "yt_dlp.*"]
+ignore_missing_imports = true
