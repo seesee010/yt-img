@@ -16,6 +16,8 @@ jobs:
       - run: uv run ruff check
       - run: uv run ruff format --check
       - run: uv run mypy
+      - name: scripts/check stays in sync with these steps
+        run: grep -q 'uv run ruff check' scripts/check && grep -q 'uv run mypy' scripts/check
 
   test:
     runs-on: ubuntu-latest
