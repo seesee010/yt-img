@@ -35,6 +35,16 @@ $ yt-img https://example.com/demo.mp4 -q
 demo.png
 ```
 
+Keep every distinct frame instead of the best 16, spread over numbered sheets:
+
+```console
+$ yt-img https://youtu.be/aqz-KE-bpKQ --pages -q
+aqz-KE-bpKQ-1.png
+aqz-KE-bpKQ-2.png
+aqz-KE-bpKQ-3.png
+aqz-KE-bpKQ-4.png
+```
+
 ## Install
 
 yt-img needs [ffmpeg](https://ffmpeg.org) on your `PATH`.
@@ -61,7 +71,7 @@ SOURCE ──► detect ──► download ──► sample ──► distinct �
 2. **Download** – only the video stream, capped at 720p. Playlists and live streams are refused before anything is downloaded.
 3. **Sample** – ffmpeg keeps the first frame and then every frame at least `--interval` seconds after the previous one, with its real timestamp. Anything ffmpeg can decode works: mp4, mkv, webm, mov, avi, flv, ts, gif, m4v, ogv and more.
 4. **Distinct** – a frame is kept only if it differs from the **last kept** frame by at least `--threshold`. The difference is the mean absolute RGB difference on a 64×36 thumbnail. Noise is ignored, and slow pans add up.
-5. **Spread** – if more than `--count` frames survive, they are picked evenly over the whole video, always including the first and the last.
+5. **Spread** – if more than `--count` frames survive, they are picked evenly over the whole video, always including the first and the last. With `--pages` nothing is dropped: the frames are split in order into as many sheets as needed.
 6. **Tile** – a grid with `--columns` per row and timestamps in the corner, saved as png, jpg or webp depending on the extension.
 
 ## Options
@@ -73,13 +83,14 @@ SOURCE ──► detect ──► download ──► sample ──► distinct �
 | `-i`, `--interval` | `10` | Seconds between sampled frames (≥ 0.1) |
 | `-t`, `--threshold` | `0.05` | Minimum difference to the last kept frame, 0–1. Use `0` to keep every sample |
 | `-n`, `--count` | `16` | Maximum number of frames on the sheet |
+| `-p`, `--pages` | | Keep every distinct frame: write numbered sheets of `--count` frames (`name-1.png`, `name-2.png`, …) instead of thinning out |
 | `-c`, `--columns` | `4` | Frames per row |
 | `-w`, `--width` | `480` | Width of each frame in pixels (≥ 16) |
 | `--no-labels` | | Do not print timestamps on the frames |
 | `-q`, `--quiet` | | Only print the output path |
 | `--version` | | Print the version |
 
-**Output contract:** stdout carries only the path of the written image, so `yt-img … | xargs …` works. Progress goes to stderr.
+**Output contract:** stdout carries only the paths of the written images, one per line, so `yt-img … | xargs …` works. Progress goes to stderr.
 **Exit codes:** `0` success · `1` error, as one `yt-img: error: …` line · `2` bad arguments · `130` interrupted.
 
 ## Development

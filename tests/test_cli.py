@@ -239,6 +239,75 @@ def test_real_youtube_video(
         assert sheet.width > 480
 
 
+# -- --pages -----------------------------------------------------------------
+
+
+def test_pages_keep_every_distinct_frame(
+    make_video: VideoFactory, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    colors = ["red", "lime", "blue", "yellow"] * 6
+    video = make_video(colors, seconds=10)
+    out = tmp_path / "sheet.png"
+    code, stdout, stderr = run(
+        [str(video), "-o", str(out), "-w", "64", "--pages"], capsys
+    )
+    assert code == 0
+    assert "24 sampled, 24 distinct, 2 sheets" in stderr
+    first, second = tmp_path / "sheet-1.png", tmp_path / "sheet-2.png"
+    assert stdout == f"{first}\n{second}\n"
+    assert not out.exists()
+    want = {"red": RED, "lime": LIME, "blue": BLUE, "yellow": (255, 255, 0)}
+    with Image.open(first) as a, Image.open(second) as b:
+        assert grid(a, 64, 36) == (4, 4)
+        assert grid(b, 64, 36) == (4, 2)
+        got = [cell_color(a, i, 4, 64, 36) for i in range(16)]
+        got += [cell_color(b, i, 4, 64, 36) for i in range(8)]
+    # In order, nothing skipped: frame k shows colour k.
+    for k, (pixel, name) in enumerate(zip(got, colors, strict=True)):
+        assert close(pixel, want[name]), (k, pixel, name)
+
+
+def test_pages_with_a_single_sheet(
+    make_video: VideoFactory, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    video = make_video(["red", "blue"], seconds=10)
+    out = tmp_path / "sheet.webp"
+    code, stdout, stderr = run([str(video), "-o", str(out), "-p", "-w", "64"], capsys)
+    assert code == 0
+    assert "2 sampled, 2 distinct, 1 sheet\n" in stderr
+    assert stdout == f"{tmp_path / 'sheet-1.webp'}\n"
+
+
+def test_pages_are_zero_padded(
+    make_video: VideoFactory,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    video = make_video(["red", "lime", "blue", "yellow", "white"] * 2, seconds=10)
+    monkeypatch.chdir(tmp_path)
+    code, stdout, _ = run([str(video), "--pages", "-n", "1", "-w", "64"], capsys)
+    assert code == 0
+    names = stdout.split()
+    assert names == [f"{video.stem}-{i:02}.png" for i in range(1, 11)]
+    assert names == sorted(names)
+    assert all((tmp_path / n).is_file() for n in names)
+
+
+@pytest.mark.parametrize(
+    ("name", "page", "total", "expected"),
+    [
+        ("a.png", 1, 1, "a-1.png"),
+        ("a.png", 3, 9, "a-3.png"),
+        ("a.png", 3, 10, "a-03.png"),
+        ("a.png", 42, 100, "a-042.png"),
+        ("dir/b.c.jpg", 2, 2, "dir/b.c-2.jpg"),
+    ],
+)
+def test_numbered(name: str, page: int, total: int, expected: str) -> None:
+    assert cli.numbered(Path(name), page, total) == Path(expected)
+
+
 # -- errors and argument checking ---------------------------------------------
 
 
@@ -320,11 +389,12 @@ def test_defaults() -> None:
         16,
         4,
     )
-    assert (args.width, args.labels, args.quiet, args.output) == (
+    assert (args.width, args.labels, args.quiet, args.output, args.pages) == (
         480,
         True,
         False,
         None,
+        False,
     )
 
 
