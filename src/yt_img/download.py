@@ -1,5 +1,7 @@
 """Fetch a YouTube video with yt-dlp."""
 
+import contextlib
+import io
 from pathlib import Path
 from typing import Any
 
@@ -31,7 +33,7 @@ class _Silent:
 def options(out_dir: Path) -> dict[str, Any]:
     return {
         "format": FORMAT,
-        "outtmpl": str(out_dir / "video.%(ext)s"),
+        "outtmpl": str(out_dir / "%(id)s.%(ext)s"),
         "noplaylist": True,
         "logger": _Silent(),
         "noprogress": True,
@@ -40,8 +42,12 @@ def options(out_dir: Path) -> dict[str, Any]:
 
 def download(url: str, out_dir: Path) -> Path:
     """Download the video behind *url* into *out_dir* and return its path."""
+    # Some yt-dlp messages bypass the logger and go to sys.stderr directly.
     try:
-        with yt_dlp.YoutubeDL(options(out_dir)) as ydl:
+        with (
+            contextlib.redirect_stderr(io.StringIO()),
+            yt_dlp.YoutubeDL(options(out_dir)) as ydl,
+        ):
             info = ydl.extract_info(url, download=False)
             if info.get("_type") in ("playlist", "multi_video"):
                 raise YtImgError("playlists are not supported, pass a single video")
