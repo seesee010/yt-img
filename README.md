@@ -3,7 +3,7 @@
 # yt-img
 
 **One video in, one image out.**
-Turn a YouTube link or any local video into a single contact sheet of its distinct scenes, ready to hand to an AI, a chat or a ticket.
+Turn a YouTube link or any local video into contact sheets of its distinct scenes, ready to hand to an AI, a chat or a ticket.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/seesee010/yt-img/ci.yml?branch=master&style=for-the-badge&label=CI)](https://github.com/seesee010/yt-img/actions/workflows/ci.yml)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen?style=for-the-badge)
@@ -13,36 +13,38 @@ Turn a YouTube link or any local video into a single contact sheet of its distin
 
 ![Contact sheet of Big Buck Bunny made by yt-img](docs/example.jpg)
 
-<sub>`yt-img https://youtu.be/aqz-KE-bpKQ -w 320` — 10:34 of video, 64 samples, 62 distinct, 16 on the sheet.</sub>
+<sub>`yt-img https://youtu.be/aqz-KE-bpKQ --single -w 320` — 10:34 of video, 64 samples, 62 distinct, squeezed into one sheet of 16.</sub>
 
 </div>
 
 ## Quick start
 
+Every distinct frame, in order, on sheets of 16:
+
 ```console
 $ yt-img https://youtu.be/aqz-KE-bpKQ
 downloading https://youtu.be/aqz-KE-bpKQ
 sampling one frame every 10 s
-64 sampled, 62 distinct, 16 on the sheet
+64 sampled, 62 distinct, 62 on 4 sheets
+aqz-KE-bpKQ-1.png
+aqz-KE-bpKQ-2.png
+aqz-KE-bpKQ-3.png
+aqz-KE-bpKQ-4.png
+```
+
+Only one image allowed? Squeeze the video into a single sheet. The 16 frames are picked evenly from start to end:
+
+```console
+$ yt-img https://youtu.be/aqz-KE-bpKQ --single -q
 aqz-KE-bpKQ.png
 ```
 
-Local files and direct links work the same way:
+Local files and direct links work the same way. A short clip fits on one sheet and keeps its plain name:
 
 ```console
 $ yt-img ~/Videos/talk.mkv -o talk.webp
 $ yt-img https://example.com/demo.mp4 -q
 demo.png
-```
-
-Keep every distinct frame instead of the best 16, spread over numbered sheets:
-
-```console
-$ yt-img https://youtu.be/aqz-KE-bpKQ --pages -q
-aqz-KE-bpKQ-1.png
-aqz-KE-bpKQ-2.png
-aqz-KE-bpKQ-3.png
-aqz-KE-bpKQ-4.png
 ```
 
 ## Install
@@ -61,29 +63,30 @@ uv tool install git+https://github.com/seesee010/yt-img.git
 ## How it works
 
 ```
-SOURCE ──► detect ──► download ──► sample ──► distinct ──► spread ──► tile ──► OUT
-          YouTube?    yt-dlp      ffmpeg,     differs     at most     grid +
-          URL? file?  ≤720p,      every 10 s  ≥ 5 % from  16, evenly  timestamps
-                      no audio                last kept   over video
+SOURCE ──► detect ──► download ──► sample ──► distinct ──► split ──► tile ──► OUT
+          YouTube?    yt-dlp      ffmpeg,     differs     16 per    grid +    one or
+          URL? file?  ≤720p,      every 10 s  ≥ 5 % from  sheet     timestamps more
+                      no audio                last kept   (--single:          sheets
+                                                          16 evenly)
 ```
 
 1. **Detect** – YouTube links (`youtube.com`, `youtu.be`, shorts, embed, live, music, with or without `https://`) go to yt-dlp. Other `http(s)` links and local files go straight to ffmpeg.
 2. **Download** – only the video stream, capped at 720p. Playlists and live streams are refused before anything is downloaded.
 3. **Sample** – ffmpeg keeps the first frame and then every frame at least `--interval` seconds after the previous one, with its real timestamp. Anything ffmpeg can decode works: mp4, mkv, webm, mov, avi, flv, ts, gif, m4v, ogv and more.
 4. **Distinct** – a frame is kept only if it differs from the **last kept** frame by at least `--threshold`. The difference is the mean absolute RGB difference on a 64×36 thumbnail. Noise is ignored, and slow pans add up.
-5. **Spread** – if more than `--count` frames survive, they are picked evenly over the whole video, always including the first and the last. With `--pages` nothing is dropped: the frames are split in order into as many sheets as needed.
-6. **Tile** – a grid with `--columns` per row and timestamps in the corner, saved as png, jpg or webp depending on the extension.
+5. **Split** – the surviving frames are split in order into sheets of `--count`, so nothing is lost. With `--single`, `--count` frames are picked evenly over the whole video instead, always including the first and the last.
+6. **Tile** – a grid with `--columns` per row and timestamps in the corner, saved as png, jpg or webp depending on the extension. Several sheets are numbered `name-1.png`, `name-2.png`, … (zero-padded from 10 on). A single sheet keeps the plain name.
 
 ## Options
 
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `SOURCE` | | YouTube URL, direct video URL or local video file |
-| `-o`, `--output` | `<video name>.png` | Output image: `.png`, `.jpg`, `.jpeg` or `.webp` |
+| `-o`, `--output` | `<video name>.png` | Output image: `.png`, `.jpg`, `.jpeg` or `.webp`, numbered when there are several sheets |
 | `-i`, `--interval` | `10` | Seconds between sampled frames (≥ 0.1) |
 | `-t`, `--threshold` | `0.05` | Minimum difference to the last kept frame, 0–1. Use `0` to keep every sample |
-| `-n`, `--count` | `16` | Maximum number of frames on the sheet |
-| `-p`, `--pages` | | Keep every distinct frame: write numbered sheets of `--count` frames (`name-1.png`, `name-2.png`, …) instead of thinning out |
+| `-n`, `--count` | `16` | Maximum number of frames per sheet |
+| `-s`, `--single` | | Squeeze everything into one sheet of `--count` frames, picked evenly over the video |
 | `-c`, `--columns` | `4` | Frames per row |
 | `-w`, `--width` | `480` | Width of each frame in pixels (≥ 16) |
 | `--no-labels` | | Do not print timestamps on the frames |

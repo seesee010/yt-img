@@ -23,6 +23,16 @@ def test_every_option_is_documented(option: str) -> None:
     assert f"`{option}`" in README
 
 
+def test_no_stale_options_in_the_table() -> None:
+    known = set(documented_options())
+    rows = [line for line in README.splitlines() if line.startswith("| `-")]
+    assert rows
+    for row in rows:
+        first_cell = row.split("|")[1]
+        for option in re.findall(r"`(-[^`]+)`", first_cell):
+            assert option in known, f"README documents unknown option {option}"
+
+
 def test_documented_defaults_match_the_parser() -> None:
     args = cli.parser().parse_args(["x"])
     for option, value in [
