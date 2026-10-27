@@ -3,6 +3,8 @@ name = "yt-img"
 version = "0.1.0"
 description = "Turn a YouTube URL or a local video into one contact sheet of distinct frames"
 readme = "README.md"
+license = "GPL-2.0-only"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     "pillow>=10.1",
@@ -10,7 +12,7 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
